@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="manifest" href="manifest.json">
+    <title>Avisa Cancelamento</title>
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; padding: 20px; background: #f0f2f5; color: #333; }
+        .container { max-width: 400px; margin: auto; background: white; padding: 20px; border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+        h2 { color: #e63946; text-align: center; }
+        input { width: 100%; padding: 12px; margin: 8px 0; border: 1px solid #ddd; border-radius: 8px; box-sizing: border-box; }
+        button { width: 100%; padding: 12px; background: #e63946; color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; margin-top: 10px; }
+        .lista { margin-top: 20px; border-top: 1px solid #eee; padding-top: 10px; }
+        .item { background: #fff5f5; padding: 10px; border-radius: 5px; margin-bottom: 5px; font-size: 14px; border-left: 4px solid #e63946; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>🚫 Stop Pay</h2>
+    <input type="text" id="servico" placeholder="Nome da Assinatura (ex: Netflix)">
+    <label>Vencimento:</label>
+    <input type="date" id="dataVenc">
+    <button onclick="agendar()">Agendar Alerta</button>
+
+    <div class="lista" id="listaAssinaturas">
+        </div>
+</div>
+
+<script>
+    // Registro do Service Worker
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('sw.js')
+        .then(() => console.log("SW registrado!"));
+    }
+
+    // Carregar dados salvos ao abrir
+    window.onload = exibirAssinaturas;
+
+    function agendar() {
+        const nome = document.getElementById('servico').value;
+        const data = document.getElementById('dataVenc').value;
+
+        if(!nome || !data) return alert("Preencha tudo!");
+
+        const novaAssinatura = { nome, data };
+        let assinaturas = JSON.parse(localStorage.getItem('assinaturas') || "[]");
+        assinaturas.push(novaAssinatura);
+        localStorage.setItem('assinaturas', JSON.stringify(assinaturas));
+
+        // Pedir permissão e testar notificação
+        Notification.requestPermission().then(perm => {
+            if(perm === "granted") {
+                alert("Agendado! Você será avisado no dia.");
+                verificarDatas(); // Inicia monitoramento
+            }
+        });
+
+        exibirAssinaturas();
+    }
+
+    function exibirAssinaturas() {
+        const lista = document.getElementById('listaAssinaturas');
+        const dados = JSON.parse(localStorage.getItem('assinaturas') || "[]");
+        lista.innerHTML = "<h3>Suas Assinaturas:</h3>";
+        dados.forEach(item => {
+            lista.innerHTML += `<div class="item"><strong>${item.nome}</strong> - Vence: ${item.data}</div>`;
+        });
+    }
+
+    // Lógica simples de checagem (para fins de demonstração)
+    function verificarDatas() {
+        const dados = JSON.parse(localStorage.getItem('assinaturas') || "[]");
+        const hoje = new Date().toISOString().split('T')[0];
+
+        dados.forEach(item => {
+            if(item.data === hoje) {
+                new Notification("Hora de Cancelar!", {
+                    body: `Sua assinatura de ${item.nome} vence hoje!`,
+                });
+            }
+        });
+    }
+    
+    // Checa a cada 1 hora
+    setInterval(verificarDatas, 3600000);
+
+</script>
+</body>
+</html>
