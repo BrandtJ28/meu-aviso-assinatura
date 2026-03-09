@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Verificador de Vencimentos</title>
+</head>
+<body>
+    <script type="module">
+        // Importe as configurações do seu Firebase aqui
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { getFirestore, collection, getDocs, query, where } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+        const firebaseConfig = {
+            // COLE AQUI AS SUAS CREDENCIAIS DO FIREBASE (Aquelas do index.html)
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+
+        async function verificarVencimentos() {
+            const hoje = new Date().toISOString().split('T')[0]; // Pega a data de hoje (YYYY-MM-DD)
+            const q = query(collection(db, "assinaturas"), where("dataVencimento", "==", hoje));
+            
+            const querySnapshot = await getDocs(q);
+            querySnapshot.forEach((doc) => {
+                const dados = doc.data();
+                // Aqui você coloca o link do seu Webhook do Telegram ou WhatsApp
+                fetch(`https://api.telegram.org/botSEU_TOKEN/sendMessage?chat_id=SEU_ID&text=Vence hoje: ${dados.nome}`);
+            });
+            console.log("Verificação concluída!");
+        }
+
+        verificarVencimentos();
+    </script>
+</body>
+</html>
