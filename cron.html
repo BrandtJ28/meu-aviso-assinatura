@@ -1,35 +1,21 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Verificador de Vencimentos</title>
-</head>
-<body>
-    <script type="module">
-        // Importe as configurações do seu Firebase aqui
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-        import { getFirestore, collection, getDocs, query, where } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+// Import the functions you need from the SDKs you need
+import { initializeApp } from "firebase/app";
+import { getAnalytics } from "firebase/analytics";
+// TODO: Add SDKs for Firebase products that you want to use
+// https://firebase.google.com/docs/web/setup#available-libraries
 
-        const firebaseConfig = {
-            // COLE AQUI AS SUAS CREDENCIAIS DO FIREBASE (Aquelas do index.html)
-        };
+// Your web app's Firebase configuration
+// For Firebase JS SDK v7.20.0 and later, measurementId is optional
+const firebaseConfig = {
+  apiKey: "AIzaSyCvb_5kfqZ0TcvqqXYJ3H0zje7lkxg5KT0",
+  authDomain: "stop-pay.firebaseapp.com",
+  projectId: "stop-pay",
+  storageBucket: "stop-pay.firebasestorage.app",
+  messagingSenderId: "924558165559",
+  appId: "1:924558165559:web:f9cf09b70071bac7e7e1b2",
+  measurementId: "G-FVRE5N3LGL"
+};
 
-        const app = initializeApp(firebaseConfig);
-        const db = getFirestore(app);
-
-        async function verificarVencimentos() {
-            const hoje = new Date().toISOString().split('T')[0]; // Pega a data de hoje (YYYY-MM-DD)
-            const q = query(collection(db, "assinaturas"), where("dataVencimento", "==", hoje));
-            
-            const querySnapshot = await getDocs(q);
-            querySnapshot.forEach((doc) => {
-                const dados = doc.data();
-                // Aqui você coloca o link do seu Webhook do Telegram ou WhatsApp
-                fetch(`https://api.telegram.org/botSEU_TOKEN/sendMessage?chat_id=SEU_ID&text=Vence hoje: ${dados.nome}`);
-            });
-            console.log("Verificação concluída!");
-        }
-
-        verificarVencimentos();
-    </script>
-</body>
-</html>
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
+const analytics = getAnalytics(app);
