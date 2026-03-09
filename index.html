@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="manifest" href="manifest.json">
-    <title>Avisa Cancelamento</title>
+    <title>Avisa Cancelamento - Stop Pay</title>
     <style>
         body { font-family: 'Segoe UI', sans-serif; padding: 20px; background: #f0f2f5; color: #333; }
         .container { max-width: 400px; margin: auto; background: white; padding: 20px; border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
@@ -22,70 +22,100 @@
     <input type="text" id="servico" placeholder="Nome da Assinatura (ex: Netflix)">
     <label>Vencimento:</label>
     <input type="date" id="dataVenc">
-    <button onclick="agendar()">Agendar Alerta</button>
+    <button id="btnAgendar">Agendar Alerta</button>
 
     <div class="lista" id="listaAssinaturas">
-        </div>
+        <h3>Suas Assinaturas:</h3>
+        <div id="itensFirebase">Carregando assinaturas...</div>
+    </div>
 </div>
 
-<script>
-    // Registro do Service Worker
-    if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.register('sw.js')
-        .then(() => console.log("SW registrado!"));
-    }
+<script type="module">
+    // IMPORTANTE: Importando o Firebase do jeito certo para Web
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+    import { getFirestore, collection, addDoc, getDocs, query, orderBy } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
-    // Carregar dados salvos ao abrir
-    window.onload = exibirAssinaturas;
+    // Suas credenciais que você me passou
+    const firebaseConfig = {
+      apiKey: "AIzaSyCvb_5kfqZ0TcvqqXYJ3H0zje7lkxg5KT0",
+      authDomain: "stop-pay.firebaseapp.com",
+      projectId: "stop-pay",
+      storageBucket: "stop-pay.firebasestorage.app",
+      messagingSenderId: "924558165559",
+      appId: "1:924558165559:web:f9cf09b70071bac7e7e1b2",
+      measurementId: "G-FVRE5N3LGL"
+    };
 
-    function agendar() {
+    // Inicializa o Firebase
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    // FUNÇÃO PARA SALVAR NO FIREBASE
+    async function agendar() {
         const nome = document.getElementById('servico').value;
         const data = document.getElementById('dataVenc').value;
 
         if(!nome || !data) return alert("Preencha tudo!");
 
-        const novaAssinatura = { nome, data };
-        let assinaturas = JSON.parse(localStorage.getItem('assinaturas') || "[]");
-        assinaturas.push(novaAssinatura);
-        localStorage.setItem('assinaturas', JSON.stringify(assinaturas));
+        try {
+            // Salva na coleção "assinaturas" que você criou no Firebase
+            await addDoc(collection(db, "assinaturas"), {
+                nome: nome,
+                dataVencimento: data,
+                criadoEm: new Date()
+            });
 
-        // Pedir permissão e testar notificação
-        Notification.requestPermission().then(perm => {
-            if(perm === "granted") {
-                alert("Agendado! Você será avisado no dia.");
-                verificarDatas(); // Inicia monitoramento
+            alert("Sucesso! O robô do Telegram vai te avisar no dia.");
+            document.getElementById('servico').value = "";
+            document.getElementById('dataVenc').value = "";
+            
+            exibirAssinaturas(); // Atualiza a lista na tela
+
+        } catch (e) {
+            console.error("Erro ao salvar no Banco: ", e);
+            alert("Erro ao salvar. Verifique se o Banco de Dados está em 'Modo de Teste'.");
+        }
+    }
+
+    // FUNÇÃO PARA BUSCAR E EXIBIR AS ASSINATURAS DO BANCO
+    async function exibirAssinaturas() {
+        const listaDiv = document.getElementById('itensFirebase');
+        listaDiv.innerHTML = "Carregando...";
+
+        try {
+            const q = query(collection(db, "assinaturas"), orderBy("dataVencimento", "asc"));
+            const querySnapshot = await getDocs(q);
+            
+            listaDiv.innerHTML = ""; // Limpa para recarregar
+
+            if (querySnapshot.empty) {
+                listaDiv.innerHTML = "<p>Nenhuma assinatura cadastrada.</p>";
+                return;
             }
-        });
 
-        exibirAssinaturas();
+            querySnapshot.forEach((doc) => {
+                const item = doc.data();
+                listaDiv.innerHTML += `
+                    <div class="item">
+                        <strong>${item.nome}</strong> - Vence: ${item.dataVencimento}
+                    </div>`;
+            });
+        } catch (e) {
+            console.error("Erro ao buscar dados: ", e);
+            listaDiv.innerHTML = "Erro ao carregar assinaturas.";
+        }
     }
 
-    function exibirAssinaturas() {
-        const lista = document.getElementById('listaAssinaturas');
-        const dados = JSON.parse(localStorage.getItem('assinaturas') || "[]");
-        lista.innerHTML = "<h3>Suas Assinaturas:</h3>";
-        dados.forEach(item => {
-            lista.innerHTML += `<div class="item"><strong>${item.nome}</strong> - Vence: ${item.data}</div>`;
-        });
+    // Configura o clique do botão
+    document.getElementById('btnAgendar').addEventListener('click', agendar);
+
+    // Carrega a lista assim que abrir a página
+    window.onload = exibirAssinaturas;
+
+    // Registro do Service Worker (Opcional para PWA)
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('sw.js').catch(() => {});
     }
-
-    // Lógica simples de checagem (para fins de demonstração)
-    function verificarDatas() {
-        const dados = JSON.parse(localStorage.getItem('assinaturas') || "[]");
-        const hoje = new Date().toISOString().split('T')[0];
-
-        dados.forEach(item => {
-            if(item.data === hoje) {
-                new Notification("Hora de Cancelar!", {
-                    body: `Sua assinatura de ${item.nome} vence hoje!`,
-                });
-            }
-        });
-    }
-    
-    // Checa a cada 1 hora
-    setInterval(verificarDatas, 3600000);
-
 </script>
 </body>
 </html>
