@@ -2,7 +2,7 @@
 <html lang="pt-br">
 <head>
     <meta charset="UTF-8">
-    <title>Verificador Stop Pay</title>
+    <title>Verificador Stop Pay - Telegram</title>
 </head>
 <body>
     <h2 id="status">Verificando vencimentos...</h2>
@@ -26,13 +26,16 @@
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
 
+        // CONFIGURAÇÃO DO TELEGRAM (SUBSTITUA AQUI)
+        const TELEGRAM_TOKEN = "COLE_AQUI_O_TOKEN_DO_BOTFATHER";
+        const TELEGRAM_CHAT_ID = "COLE_AQUI_O_ID_DO_USERINFOBOT";
+
         async function verificarVencimentos() {
             try {
-                // Pega a data de hoje no formato YYYY-MM-DD
-                const hoje = new Date().toISOString().split('T')[0];
+                // Ajuste para pegar a data correta no fuso horário local (Brasil)
+                const hoje = new Date().toLocaleDateString('en-CA'); // Formato YYYY-MM-DD
                 const status = document.getElementById('status');
                 
-                // Busca no banco assinaturas que vencem hoje
                 const q = query(collection(db, "assinaturas"), where("dataVencimento", "==", hoje));
                 const querySnapshot = await getDocs(q);
                 
@@ -41,18 +44,26 @@
                     return;
                 }
 
-                querySnapshot.forEach((doc) => {
+                querySnapshot.forEach(async (doc) => {
                     const conta = doc.data();
-                    // EXIBE NA TELA (Para teste)
+                    
+                    // Exibe na página
                     const li = document.createElement('li');
                     li.innerText = `ALERTA: A conta ${conta.nome} vence hoje!`;
                     document.getElementById('lista').appendChild(li);
 
-                    // AQUI VOCÊ VAI COLOCAR O LINK DO SEU TELEGRAM OU WHATSAPP DEPOIS
-                    console.log("Notificação enviada para: " + conta.nome);
+                    // Envia para o Telegram
+                    const mensagem = `🚨 *ALERTA DE VENCIMENTO* 🚨%0A%0A📌 *Conta:* ${conta.nome}%0A💰 *Valor:* R$ ${conta.valor || 'Não informado'}%0A📅 *Vence hoje:* ${hoje}`;
+                    
+                    try {
+                        await fetch(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage?chat_id=${TELEGRAM_CHAT_ID}&text=${mensagem}&parse_mode=Markdown`);
+                        console.log("Mensagem enviada para: " + conta.nome);
+                    } catch (err) {
+                        console.error("Erro ao enviar Telegram:", err);
+                    }
                 });
 
-                status.innerText = "Verificação concluída para hoje!";
+                status.innerText = "Verificação concluída! Avisos enviados.";
                 
             } catch (error) {
                 console.error("Erro ao buscar:", error);
