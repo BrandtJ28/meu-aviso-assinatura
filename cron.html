@@ -1,21 +1,66 @@
-// Import the functions you need from the SDKs you need
-import { initializeApp } from "firebase/app";
-import { getAnalytics } from "firebase/analytics";
-// TODO: Add SDKs for Firebase products that you want to use
-// https://firebase.google.com/docs/web/setup#available-libraries
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>Verificador Stop Pay</title>
+</head>
+<body>
+    <h2 id="status">Verificando vencimentos...</h2>
+    <ul id="lista"></ul>
 
-// Your web app's Firebase configuration
-// For Firebase JS SDK v7.20.0 and later, measurementId is optional
-const firebaseConfig = {
-  apiKey: "AIzaSyCvb_5kfqZ0TcvqqXYJ3H0zje7lkxg5KT0",
-  authDomain: "stop-pay.firebaseapp.com",
-  projectId: "stop-pay",
-  storageBucket: "stop-pay.firebasestorage.app",
-  messagingSenderId: "924558165559",
-  appId: "1:924558165559:web:f9cf09b70071bac7e7e1b2",
-  measurementId: "G-FVRE5N3LGL"
-};
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { getFirestore, collection, getDocs, query, where } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
-const analytics = getAnalytics(app);
+        // Suas configurações do Firebase
+        const firebaseConfig = {
+          apiKey: "AIzaSyCvb_5kfqZ0TcvqqXYJ3H0zje7lkxg5KT0",
+          authDomain: "stop-pay.firebaseapp.com",
+          projectId: "stop-pay",
+          storageBucket: "stop-pay.firebasestorage.app",
+          messagingSenderId: "924558165559",
+          appId: "1:924558165559:web:f9cf09b70071bac7e7e1b2",
+          measurementId: "G-FVRE5N3LGL"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+
+        async function verificarVencimentos() {
+            try {
+                // Pega a data de hoje no formato YYYY-MM-DD
+                const hoje = new Date().toISOString().split('T')[0];
+                const status = document.getElementById('status');
+                
+                // Busca no banco assinaturas que vencem hoje
+                const q = query(collection(db, "assinaturas"), where("dataVencimento", "==", hoje));
+                const querySnapshot = await getDocs(q);
+                
+                if (querySnapshot.empty) {
+                    status.innerText = "Nenhuma conta vence hoje (" + hoje + ").";
+                    return;
+                }
+
+                querySnapshot.forEach((doc) => {
+                    const conta = doc.data();
+                    // EXIBE NA TELA (Para teste)
+                    const li = document.createElement('li');
+                    li.innerText = `ALERTA: A conta ${conta.nome} vence hoje!`;
+                    document.getElementById('lista').appendChild(li);
+
+                    // AQUI VOCÊ VAI COLOCAR O LINK DO SEU TELEGRAM OU WHATSAPP DEPOIS
+                    console.log("Notificação enviada para: " + conta.nome);
+                });
+
+                status.innerText = "Verificação concluída para hoje!";
+                
+            } catch (error) {
+                console.error("Erro ao buscar:", error);
+                document.getElementById('status').innerText = "Erro ao verificar banco de dados.";
+            }
+        }
+
+        verificarVencimentos();
+    </script>
+</body>
+</html>
