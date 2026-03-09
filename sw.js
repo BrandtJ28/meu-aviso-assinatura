@@ -1,25 +1,40 @@
-importScripts('https://www.gstatic.com/firebasejs/9.0.0/firebase-app-compat.js');
-importScripts('https://www.gstatic.com/firebasejs/9.0.0/firebase-messaging-compat.js');
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-app.js";
+  import { getFirestore, collection, addDoc } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-firestore.js";
+  import { getMessaging, getToken } from "https://www.gstatic.com/firebasejs/10.0.0/firebase-messaging.js";
 
-// COLE AQUI o seu firebaseConfig que aparece na sua foto
-const firebaseConfig = {
-    apiKey: "AIzaSyCvb_5kfqZ0TcvqqXYJ3H0zj...", // Complete com o seu da foto
-    authDomain: "stop-pay.firebaseapp.com",
-    projectId: "stop-pay",
-    storageBucket: "stop-pay.appspot.com",
-    messagingSenderId: "924558165559",
-    appId: "1:924558165559:web:f9cf09b7007..."
-};
+  const firebaseConfig = {
+    apiKey: "SUA_API_KEY",
+    authDomain: "SEU_PROJETO.firebaseapp.com",
+    projectId: "SEU_PROJETO",
+    messagingSenderId: "SEU_ID",
+    appId: "SEU_APP_ID"
+  };
 
-firebase.initializeApp(firebaseConfig);
-const messaging = firebase.messaging();
+  const app = initializeApp(firebaseConfig);
+  const db = getFirestore(app);
+  const messaging = getMessaging(app);
 
-// Exibe a notificação quando o app está fechado
-messaging.onBackgroundMessage((payload) => {
-    const notificationTitle = payload.notification.title;
-    const notificationOptions = {
-        body: payload.notification.body,
-        icon: 'https://cdn-icons-png.flaticon.com/512/1827/1827347.png'
-    };
-    self.registration.showNotification(notificationTitle, notificationOptions);
-});
+  window.salvarNoServidor = async () => {
+    const nome = document.getElementById('servico').value;
+    const data = document.getElementById('dataVenc').value;
+
+    try {
+      // 1. Pede permissão e pega o Token do celular
+      const token = await getToken(messaging, { vapidKey: 'SUA_CHAVE_VAPID_AQUI' });
+      
+      // 2. Salva no Banco de Dados do Google
+      await addDoc(collection(db, "assinaturas"), {
+        nome: nome,
+        dataVencimento: data,
+        userToken: token,
+        ativa: true
+      });
+
+      alert("Agendado com sucesso no servidor!");
+    } catch (error) {
+      console.error("Erro:", error);
+      alert("Erro ao agendar. Verifique as permissões.");
+    }
+  };
+</script>
