@@ -3,39 +3,47 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="manifest" href="manifest.json">
-    <title>Avisa Cancelamento - Stop Pay</title>
+    <title>Stop Pay - Gestor com Horário</title>
     <style>
         body { font-family: 'Segoe UI', sans-serif; padding: 20px; background: #f0f2f5; color: #333; }
-        .container { max-width: 400px; margin: auto; background: white; padding: 20px; border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+        .container { max-width: 450px; margin: auto; background: white; padding: 20px; border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
         h2 { color: #e63946; text-align: center; }
+        label { font-size: 12px; font-weight: bold; color: #666; }
         input { width: 100%; padding: 12px; margin: 8px 0; border: 1px solid #ddd; border-radius: 8px; box-sizing: border-box; }
         button { width: 100%; padding: 12px; background: #e63946; color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; margin-top: 10px; }
         .lista { margin-top: 20px; border-top: 1px solid #eee; padding-top: 10px; }
-        .item { background: #fff5f5; padding: 10px; border-radius: 5px; margin-bottom: 5px; font-size: 14px; border-left: 4px solid #e63946; }
+        .item { background: #fff5f5; padding: 15px; border-radius: 8px; margin-bottom: 10px; border-left: 5px solid #e63946; position: relative; }
+        .btn-excluir { background: #ff4d4d; width: auto; padding: 5px 10px; font-size: 11px; margin-top: 5px; }
+        .btn-editar { background: #ffb330; width: auto; padding: 5px 10px; font-size: 11px; margin-right: 5px; }
+        .controles { display: flex; justify-content: flex-end; }
     </style>
 </head>
 <body>
 
 <div class="container">
     <h2>🚫 Stop Pay</h2>
-    <input type="text" id="servico" placeholder="Nome da Assinatura (ex: Netflix)">
-    <label>Vencimento:</label>
+    
+    <input type="hidden" id="idEdicao"> <label>Serviço:</label>
+    <input type="text" id="servico" placeholder="Ex: Netflix">
+    
+    <label>Data de Vencimento:</label>
     <input type="date" id="dataVenc">
-    <button id="btnAgendar">Agendar Alerta</button>
+    
+    <label>Horário do Alerta (Relógio):</label>
+    <input type="time" id="horaAlerta" value="09:00">
+    
+    <button id="btnSalvar">Agendar Alerta</button>
 
     <div class="lista" id="listaAssinaturas">
-        <h3>Suas Assinaturas:</h3>
-        <div id="itensFirebase">Carregando assinaturas...</div>
+        <h3>Minhas Assinaturas:</h3>
+        <div id="itensFirebase">Carregando...</div>
     </div>
 </div>
 
 <script type="module">
-    // IMPORTANTE: Importando o Firebase do jeito certo para Web
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-    import { getFirestore, collection, addDoc, getDocs, query, orderBy } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+    import { getFirestore, collection, addDoc, getDocs, doc, deleteDoc, updateDoc, query, orderBy } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
-    // Suas credenciais que você me passou
     const firebaseConfig = {
       apiKey: "AIzaSyCvb_5kfqZ0TcvqqXYJ3H0zje7lkxg5KT0",
       authDomain: "stop-pay.firebaseapp.com",
@@ -46,76 +54,88 @@
       measurementId: "G-FVRE5N3LGL"
     };
 
-    // Inicializa o Firebase
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
 
-    // FUNÇÃO PARA SALVAR NO FIREBASE
-    async function agendar() {
+    async function salvar() {
+        const id = document.getElementById('idEdicao').value;
         const nome = document.getElementById('servico').value;
         const data = document.getElementById('dataVenc').value;
+        const hora = document.getElementById('horaAlerta').value;
 
-        if(!nome || !data) return alert("Preencha tudo!");
+        if(!nome || !data || !hora) return alert("Preencha todos os campos!");
 
         try {
-            // Salva na coleção "assinaturas" que você criou no Firebase
-            await addDoc(collection(db, "assinaturas"), {
-                nome: nome,
-                dataVencimento: data,
-                criadoEm: new Date()
-            });
-
-            alert("Sucesso! O robô do Telegram vai te avisar no dia.");
-            document.getElementById('servico').value = "";
-            document.getElementById('dataVenc').value = "";
-            
-            exibirAssinaturas(); // Atualiza a lista na tela
-
-        } catch (e) {
-            console.error("Erro ao salvar no Banco: ", e);
-            alert("Erro ao salvar. Verifique se o Banco de Dados está em 'Modo de Teste'.");
-        }
+            if(id) {
+                // Modo Edição
+                await updateDoc(doc(db, "assinaturas", id), {
+                    nome: nome,
+                    dataVencimento: data,
+                    horaAlerta: hora
+                });
+                document.getElementById('idEdicao').value = "";
+                document.getElementById('btnSalvar').innerText = "Agendar Alerta";
+            } else {
+                // Modo Criação
+                await addDoc(collection(db, "assinaturas"), {
+                    nome: nome,
+                    dataVencimento: data,
+                    horaAlerta: hora,
+                    criadoEm: new Date().toISOString()
+                });
+            }
+            limparCampos();
+            exibirAssinaturas();
+        } catch (e) { alert("Erro ao salvar!"); }
     }
 
-    // FUNÇÃO PARA BUSCAR E EXIBIR AS ASSINATURAS DO BANCO
     async function exibirAssinaturas() {
         const listaDiv = document.getElementById('itensFirebase');
         listaDiv.innerHTML = "Carregando...";
+        
+        const q = query(collection(db, "assinaturas"), orderBy("dataVencimento", "asc"));
+        const snapshot = await getDocs(q);
+        listaDiv.innerHTML = "";
 
-        try {
-            const q = query(collection(db, "assinaturas"), orderBy("dataVencimento", "asc"));
-            const querySnapshot = await getDocs(q);
-            
-            listaDiv.innerHTML = ""; // Limpa para recarregar
+        snapshot.forEach((docSnap) => {
+            const item = docSnap.data();
+            const id = docSnap.id;
+            listaDiv.innerHTML += `
+                <div class="item">
+                    <strong>${item.nome}</strong><br>
+                    📅 ${item.dataVencimento} às ⏰ ${item.horaAlerta}
+                    <div class="controles">
+                        <button class="btn-editar" onclick="prepararEdicao('${id}', '${item.nome}', '${item.dataVencimento}', '${item.horaAlerta}')">Editar</button>
+                        <button class="btn-excluir" onclick="excluir('${id}')">Remover</button>
+                    </div>
+                </div>`;
+        });
+    }
 
-            if (querySnapshot.empty) {
-                listaDiv.innerHTML = "<p>Nenhuma assinatura cadastrada.</p>";
-                return;
-            }
-
-            querySnapshot.forEach((doc) => {
-                const item = doc.data();
-                listaDiv.innerHTML += `
-                    <div class="item">
-                        <strong>${item.nome}</strong> - Vence: ${item.dataVencimento}
-                    </div>`;
-            });
-        } catch (e) {
-            console.error("Erro ao buscar dados: ", e);
-            listaDiv.innerHTML = "Erro ao carregar assinaturas.";
+    window.excluir = async (id) => {
+        if(confirm("Deseja remover este alerta?")) {
+            await deleteDoc(doc(db, "assinaturas", id));
+            exibirAssinaturas();
         }
     }
 
-    // Configura o clique do botão
-    document.getElementById('btnAgendar').addEventListener('click', agendar);
-
-    // Carrega a lista assim que abrir a página
-    window.onload = exibirAssinaturas;
-
-    // Registro do Service Worker (Opcional para PWA)
-    if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.register('sw.js').catch(() => {});
+    window.prepararEdicao = (id, nome, data, hora) => {
+        document.getElementById('idEdicao').value = id;
+        document.getElementById('servico').value = nome;
+        document.getElementById('dataVenc').value = data;
+        document.getElementById('horaAlerta').value = hora;
+        document.getElementById('btnSalvar').innerText = "Atualizar Alerta";
+        window.scrollTo(0,0);
     }
+
+    function limparCampos() {
+        document.getElementById('servico').value = "";
+        document.getElementById('dataVenc').value = "";
+        document.getElementById('idEdicao').value = "";
+    }
+
+    document.getElementById('btnSalvar').addEventListener('click', salvar);
+    window.onload = exibirAssinaturas;
 </script>
 </body>
 </html>
