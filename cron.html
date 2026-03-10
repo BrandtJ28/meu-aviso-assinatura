@@ -2,17 +2,16 @@
 <html lang="pt-br">
 <head>
     <meta charset="UTF-8">
-    <title>Verificador Stop Pay - Telegram</title>
+    <title>Robô de Verificação - Stop Pay</title>
 </head>
 <body>
-    <h2 id="status">Verificando vencimentos...</h2>
-    <ul id="lista"></ul>
+    <h2 id="status">Verificando agendamentos agora...</h2>
+    <div id="log"></div>
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
         import { getFirestore, collection, getDocs, query, where } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
-        // Suas configurações do Firebase
         const firebaseConfig = {
           apiKey: "AIzaSyCvb_5kfqZ0TcvqqXYJ3H0zje7lkxg5KT0",
           authDomain: "stop-pay.firebaseapp.com",
@@ -26,52 +25,53 @@
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
 
-        // CONFIGURAÇÃO DO TELEGRAM (SUBSTITUA AQUI)
-        const TELEGRAM_TOKEN = "8699303388:AAHkgnqkcrub4O-U4LhqLaX0vtlaTVR6U9I";
-        const TELEGRAM_CHAT_ID = "8421905714";
+        // CONFIGURAÇÃO DO SEU TELEGRAM
+        const TELEGRAM_TOKEN = "COLE_AQUI_SEU_TOKEN";
+        const TELEGRAM_CHAT_ID = "COLE_AQUI_SEU_ID";
 
-        async function verificarVencimentos() {
+        async function rodarVerificador() {
+            const agora = new Date();
+            // Pega data (YYYY-MM-DD) e hora (HH:mm) local
+            const hoje = agora.toLocaleDateString('en-CA'); 
+            const horaAtual = agora.getHours().toString().padStart(2, '0') + ":" + 
+                              agora.getMinutes().toString().padStart(2, '0');
+
+            const logDiv = document.getElementById('log');
+            logDiv.innerHTML += `<p>Checando: ${hoje} às ${horaAtual}</p>`;
+
             try {
-                // Ajuste para pegar a data correta no fuso horário local (Brasil)
-                const hoje = new Date().toLocaleDateString('en-CA'); // Formato YYYY-MM-DD
-                const status = document.getElementById('status');
-                
+                // Busca contas que vencem HOJE
                 const q = query(collection(db, "assinaturas"), where("dataVencimento", "==", hoje));
-                const querySnapshot = await getDocs(q);
-                
-                if (querySnapshot.empty) {
-                    status.innerText = "Nenhuma conta vence hoje (" + hoje + ").";
+                const snapshot = await getDocs(q);
+
+                if (snapshot.empty) {
+                    document.getElementById('status').innerText = "Nada para hoje.";
                     return;
                 }
 
-                querySnapshot.forEach(async (doc) => {
+                snapshot.forEach(async (doc) => {
                     const conta = doc.data();
                     
-                    // Exibe na página
-                    const li = document.createElement('li');
-                    li.innerText = `ALERTA: A conta ${conta.nome} vence hoje!`;
-                    document.getElementById('lista').appendChild(li);
-
-                    // Envia para o Telegram
-                    const mensagem = `🚨 *ALERTA DE VENCIMENTO* 🚨%0A%0A📌 *Conta:* ${conta.nome}%0A💰 *Valor:* R$ ${conta.valor || 'Não informado'}%0A📅 *Vence hoje:* ${hoje}`;
-                    
-                    try {
-                        await fetch(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage?chat_id=${TELEGRAM_CHAT_ID}&text=${mensagem}&parse_mode=Markdown`);
-                        console.log("Mensagem enviada para: " + conta.nome);
-                    } catch (err) {
-                        console.error("Erro ao enviar Telegram:", err);
+                    // SÓ ENVIA SE O HORÁRIO BATER (ou se já passou do horário e estamos na mesma hora)
+                    if (conta.horaAlerta === horaAtual) {
+                        const msg = `⏰ *HORA DE CANCELAR!*%0A%0A📌 *Serviço:* ${conta.nome}%0A💰 *Valor:* R$ ${conta.valor || '---'}%0A🔔 *Alerta programado para:* ${conta.horaAlerta}`;
+                        
+                        await fetch(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage?chat_id=${TELEGRAM_CHAT_ID}&text=${msg}&parse_mode=Markdown`);
+                        logDiv.innerHTML += `<p style="color:green">✅ Aviso enviado: ${conta.nome}</p>`;
+                    } else {
+                        logDiv.innerHTML += `<p style="color:orange">⏳ ${conta.nome} agendado para ${conta.horaAlerta} (Aguardando...)</p>`;
                     }
                 });
 
-                status.innerText = "Verificação concluída! Avisos enviados.";
-                
-            } catch (error) {
-                console.error("Erro ao buscar:", error);
-                document.getElementById('status').innerText = "Erro ao verificar banco de dados.";
+                document.getElementById('status').innerText = "Verificação de minuto concluída.";
+            } catch (e) {
+                console.error(e);
+                document.getElementById('status').innerText = "Erro ao ler banco.";
             }
         }
 
-        verificarVencimentos();
+        // Executa assim que a página abre
+        rodarVerificador();
     </script>
 </body>
 </html>
